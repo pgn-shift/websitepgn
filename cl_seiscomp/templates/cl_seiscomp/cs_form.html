@@ -72,6 +72,10 @@
             <div class="form-group row">
                 <div class="form-group col-md-12">
                     <button type="button" class="btn btn-primary" id="fetchDataButton">Fetch gaps and blanks</button>
+                    &emsp;
+                    <input type="checkbox" id="fetchSpikesCheckbox">
+                    &nbsp;
+                    <label>Deteksi spike jenis <i>baseline shift</i> (eksperimental)</p>
                 </div>
                 <div class="form-group col-md-12">
                     <p id="last_update">Last Update: </p>
@@ -81,13 +85,16 @@
                         fetch(`{% url 'cl_seiscomp:fetch_gaps_blanks' %}`)
                             .then(response => response.text())
                             .then(data => {
+                                const spikesFetch = document.getElementById("fetchSpikesCheckbox").checked;
                                 const gapsField = document.getElementById('{{ form.gaps.id_for_label }}');
                                 const blanksField = document.getElementById('{{ form.blanks.id_for_label }}');
+                                const spikesField = spikesFetch ? document.getElementById('{{ form.spikes.id_for_label }}') : "{}";
                                 const lastUpdate = document.getElementById('last_update');
                                 data = JSON.parse(data);
                                 lastUpdate.innerHTML = `Last Update: <strong>${data.last_update}</strong>`;
                                 gapsField.value = data.gaps;
                                 blanksField.value = data.blanks;
+                                spikesField.value = spikesFetch ? data.spikes : [];
                             })
                             .catch(error => console.error('Error fetching data:', error));
                     });
