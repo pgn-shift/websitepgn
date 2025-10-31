@@ -88,7 +88,7 @@
                                 const spikesFetch = document.getElementById("fetchSpikesCheckbox").checked;
                                 const gapsField = document.getElementById('{{ form.gaps.id_for_label }}');
                                 const blanksField = document.getElementById('{{ form.blanks.id_for_label }}');
-                                const spikesField = spikesFetch ? document.getElementById('{{ form.spikes.id_for_label }}') : "{}";
+                                const spikesField = document.getElementById('{{ form.spikes.id_for_label }}');
                                 const lastUpdate = document.getElementById('last_update');
                                 data = JSON.parse(data);
                                 lastUpdate.innerHTML = `Last Update: <strong>${data.last_update}</strong>`;
