@@ -215,14 +215,44 @@ def export_to_pdf(request, record_id):
     temp_pdf = os.path.join(temp_pdf_dir, f'{simple_bast_id}.pdf')
 
     import subprocess
-    try:
-        command = ['soffice', '--headless', '--convert-to', 'pdf:calc_pdf_Export', temp_xlsx, '--outdir', temp_pdf_dir]
-        subprocess.run(command, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Error converting {temp_xlsx} to PDF: {e}")
-    finally:
-        if os.path.exists(temp_xlsx):
+    import sys
+    
+    # Try different possible LibreOffice executable names and paths
+    libreoffice_paths = [
+        'soffice',  # Linux/macOS
+        'libreoffice',  # Some Linux distros
+        'C:\\Program Files\\LibreOffice\\program\\soffice.exe',  # Windows default
+        'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',  # 32-bit on 64-bit Windows
+    ]
+    
+    success = False
+    for soffice_cmd in libreoffice_paths:
+        try:
+            command = [soffice_cmd, '--headless', '--convert-to', 'pdf:calc_pdf_Export', 
+                     temp_xlsx, '--outdir', temp_pdf_dir]
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            if result.returncode == 0:
+                success = True
+                break
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+    
+    if not success:
+        # If we get here, none of the LibreOffice paths worked
+        error_msg = (
+            "PDF conversion failed: LibreOffice is not installed or not in PATH.\n"
+            "Please install LibreOffice or add it to your system's PATH.\n"
+            "You can download it from: https://www.libreoffice.org/\n"
+            "After installation, try again."
+        )
+        return HttpResponse(error_msg, status=500, content_type='text/plain')
+    
+    # Clean up the temporary XLSX file
+    if os.path.exists(temp_xlsx):
+        try:
             os.remove(temp_xlsx)
+        except Exception as e:
+            print(f"Warning: Could not remove temporary file {temp_xlsx}: {e}")
 
     # Read the generated PDF file and return it in the response
     with open(temp_pdf, 'rb') as pdf_file:
@@ -359,7 +389,7 @@ def populate_bast_sheet(sheet, record):
     sheet['N5'] = f': {hari}'
     count_member = 0
     member_number = 1
-    for idx, member_data in enumerate(member[:9]):  # Limit to 9 members to fit in the cells K9:K17 and L9:L17
+    for idx, member_data in enumerate(member[:10]):  # Limit to 10 members to fit in the cells K9:K18 and L9:L18
         sheet[f'J{9 + idx}'] = member_number
         member_number += 1
         sheet[f'K{9 + idx}'] = member_data['nama']
@@ -367,57 +397,57 @@ def populate_bast_sheet(sheet, record):
         if re.match(r'^\s*hadir\s*$', member_data['keterangan'], re.IGNORECASE) or re.match(r'^\s*diganti\b.*$', member_data['keterangan'], re.IGNORECASE):
             count_member += 1
 
-    sheet['L18'] = f'{count_member}'
+    sheet['L19'] = f'{count_member}'
     sheet['N6'] = f': {record.waktu_pelaksanaan}'
-    sheet['G21'] = f'{record.event_indonesia}'
-    sheet['G22'] = f'{record.event_luar}'
-    sheet['G23'] = f'{record.event_indonesia + record.event_luar}'
-    sheet['L21'] = f': {record.event_dirasakan} event'
-    sheet['L22'] = f': {record.event_dikirim} event'
-    sheet['E32'] = f'Pukul: {record.waktu_cs}'
-    sheet['E33'] = f'IA (505) : Gaps = {record.count_gaps} ; Spike = {record.count_spikes} ; Blank = {record.count_blanks}'
-    sheet['E37'] = f'Rp {record.pulsa_poco:,.0f}'.replace(',', '.')
-    sheet['E39'] = f'{record.poco_exp.strftime("%d %b %Y")}'
-    sheet['G39'] = f'{record.samsung_exp.strftime("%d %b %Y")}'
-    sheet['C46'] = f'Jakarta, {tanggal}'
-    sheet['C54'] = f'{record.spv}'
-    sheet['C55'] = f'NIP. {record.NIP}'
-    sheet['D43'] = f'{record.notes}'
+    sheet['G22'] = f'{record.event_indonesia}'
+    sheet['G23'] = f'{record.event_luar}'
+    sheet['G24'] = f'{record.event_indonesia + record.event_luar}'
+    sheet['L22'] = f': {record.event_dirasakan} event'
+    sheet['L23'] = f': {record.event_dikirim} event'
+    sheet['E33'] = f'Pukul: {record.waktu_cs}'
+    sheet['E34'] = f'IA (549) : Gaps = {record.count_gaps} ; Spike = {record.count_spikes} ; Blank = {record.count_blanks}'
+    sheet['E38'] = f'Rp {record.pulsa_poco:,.0f}'.replace(',', '.')
+    sheet['E40'] = f'{record.poco_exp.strftime("%d %b %Y")}'
+    sheet['G40'] = f'{record.samsung_exp.strftime("%d %b %Y")}'
+    sheet['C47'] = f'Jakarta, {tanggal}'
+    sheet['C55'] = f'{record.spv}'
+    sheet['C56'] = f'NIP. {record.NIP}'
+    sheet['D44'] = f'{record.notes}'
 
         # import the events from the record using pandas
     events = pd.read_csv(StringIO(record.events))
 
     # add rows to the sheet
     rows_to_add = len(events)
-    sheet.insert_rows(28, amount=rows_to_add)
+    sheet.insert_rows(29, amount=rows_to_add)
     events = dataframe_to_rows(events, index=False, header=False)
     
     # insert the events to the sheet
     for r_idx, row in enumerate(events, 1):
         for c_idx, value in enumerate(row, 1):
-            sheet.cell(row=r_idx+27, column=c_idx+2, value=value).alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
+            sheet.cell(row=r_idx+28, column=c_idx+2, value=value).alignment = openpyxl.styles.Alignment(horizontal='center', vertical='center')
             # set the border of the first column to the left and the last column to the right, to thick
-            sheet.cell(row=r_idx+27, column=2).border = openpyxl.styles.Border(left=openpyxl.styles.Side(style='medium'))
-            sheet.cell(row=r_idx+27, column=17).border = openpyxl.styles.Border(right=openpyxl.styles.Side(style='medium'))
-            sheet.cell(row=r_idx+27, column=11).alignment = openpyxl.styles.Alignment(horizontal='left', vertical='center')
+            sheet.cell(row=r_idx+28, column=2).border = openpyxl.styles.Border(left=openpyxl.styles.Side(style='medium'))
+            sheet.cell(row=r_idx+28, column=17).border = openpyxl.styles.Border(right=openpyxl.styles.Side(style='medium'))
+            sheet.cell(row=r_idx+28, column=11).alignment = openpyxl.styles.Alignment(horizontal='left', vertical='center')
     
     # set the inserted cell border expanded to column 17 to thin
     default_row_height = 15.75
     for r_idx in range(rows_to_add):
         for c_idx in range(14):  # Iterate up to column 17 (index 14)
-            cell = sheet.cell(row=r_idx + 28, column=c_idx + 3) # Get the cell object
+            cell = sheet.cell(row=r_idx + 29, column=c_idx + 3) # Get the cell object
 
             # Check the length of the value in index 12
-            MMI_value = sheet.cell(row=r_idx + 28, column=12).value
+            MMI_value = sheet.cell(row=r_idx + 29, column=12).value
             if pd.notna(MMI_value):
                 if len(MMI_value) > 23:
                     # Calculate the new row height
                     new_height = default_row_height * ((len(MMI_value) // 23) + 1)
-                    sheet.row_dimensions[r_idx + 28].height = new_height
+                    sheet.row_dimensions[r_idx + 29].height = new_height
                 # Set the cell format to wrap text and center horizontally
-                sheet.cell(row=r_idx + 28, column=12).alignment = openpyxl.styles.Alignment(wrap_text=True, vertical='center')
+                sheet.cell(row=r_idx + 29, column=12).alignment = openpyxl.styles.Alignment(wrap_text=True, vertical='center')
             else:
-                sheet.row_dimensions[r_idx + 28].height = default_row_height
+                sheet.row_dimensions[r_idx + 29].height = default_row_height
                 
             cell.border = openpyxl.styles.Border(
                 left=openpyxl.styles.Side(style='thin'),
