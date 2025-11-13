@@ -50,6 +50,9 @@ local_settings.py
 
 # Django media files
 media/
+static/
 
 # SQLite database file
 db.sqlite3
+
+nohup.out
